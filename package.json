@@ -1,7 +1,6 @@
 {
   "name": "@sevenryze/db-query",
   "version": "0.1.0",
-  "private": true,
   "main": "dist/lib/index.js",
   "files": [
     "dist/",
