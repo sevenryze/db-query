@@ -1,7 +1,5 @@
 import mysql from "mysql";
-import { Connection } from "../../connection/connection";
-import { queryRunnerFactory } from "../../query-runner/query-runner-factory";
-import { IDriver } from "../driver";
+import { IDriver, ISqlRunner } from "../driver";
 
 export interface IMysqlDriverOptions extends mysql.PoolConfig {
   type: "mysql";
@@ -11,39 +9,46 @@ export interface IMysqlDriverOptions extends mysql.PoolConfig {
  * Organizes communication with MySQL DBMS.
  */
 export class MysqlDriver implements IDriver {
-  public async createQueryRunner(isTransaction?: boolean) {
-    const queryIssuer = isTransaction ? await this.getConnection() : this.pool;
+  public createSqlRunner = async (): Promise<ISqlRunner> => {
+    const connection: mysql.PoolConnection = await this.getConnection();
 
-    return queryRunnerFactory(this.connection, queryIssuer, isTransaction);
-  }
+    const execute = (sql: string, values: any[]): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        connection.query(sql, values, (error, results, fieldsInfo) => {
+          if (error) {
+            return reject(error);
+          }
+
+          resolve(results);
+        });
+      });
+    };
+
+    const release = (): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        connection.release();
+        resolve();
+      });
+    };
+
+    return { release, run: execute };
+  };
 
   /**
    * Performs connection to the database.
    */
-  public async connect(): Promise<void> {
-    await this.createPool(this.options);
-  }
+  public connect = (): Promise<void> => {
+    return this.createPool(this.options);
+  };
 
   /**
    * Closes connection with the database.
    */
-  public disconnect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.pool) {
-        return resolve();
-      }
+  public disconnect = (): Promise<void> => {
+    return this.closePool();
+  };
 
-      this.pool.end((err: any) => {
-        if (err) {
-          return reject(err);
-        }
-        this.pool = undefined;
-        resolve();
-      });
-    });
-  }
-
-  constructor(private connection: Connection, private options: IMysqlDriverOptions) {}
+  constructor(private options: IMysqlDriverOptions) {}
 
   private pool?: mysql.Pool;
 
@@ -70,6 +75,22 @@ export class MysqlDriver implements IDriver {
         connection.release();
 
         this.pool = pool;
+        resolve();
+      });
+    });
+  }
+
+  private closePool(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.pool) {
+        return resolve();
+      }
+
+      this.pool.end((err: any) => {
+        if (err) {
+          return reject(err);
+        }
+        this.pool = undefined;
         resolve();
       });
     });

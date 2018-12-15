@@ -1,4 +1,8 @@
-import { IQueryRunner, ITransactionQueryRunner } from "../query-runner/query-runner";
+export interface ISqlRunner {
+  run(sqlString: string, values?: any[]): Promise<any>;
+
+  release(): Promise<void>;
+}
 
 /**
  * Driver organizes myorm communication with specific database management system.
@@ -6,7 +10,7 @@ import { IQueryRunner, ITransactionQueryRunner } from "../query-runner/query-run
 export interface IDriver {
   /**
    * Performs connection to the database.
-   * Depend on driver type it may create a connection pool.
+   * Depend on driver type it almostly create a client pool.
    */
   connect(): Promise<void>;
 
@@ -15,5 +19,8 @@ export interface IDriver {
    */
   disconnect(): Promise<void>;
 
-  createQueryRunner(isTransaction?: boolean): Promise<IQueryRunner | ITransactionQueryRunner>;
+  /**
+   * Create a single sql executor.
+   */
+  createSqlRunner(): Promise<ISqlRunner>;
 }

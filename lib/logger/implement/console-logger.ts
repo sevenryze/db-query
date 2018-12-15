@@ -1,6 +1,5 @@
-import { Connection } from "../../connection/connection";
 import { ILogger } from "../logger";
-import { LoggerOptions } from "../logger-factory";
+import { ILoggerOptions } from "../logger-factory";
 import { BaseLogger } from "./base-logger";
 
 /**
@@ -12,11 +11,9 @@ export class ConsoleLogger extends BaseLogger implements ILogger {
    * Logs query and parameters used in it.
    */
   public logQuery = (query: string, parameters?: any[]) => {
-    if (
-      this.options === "all" ||
-      this.options === true ||
-      (Array.isArray(this.options) && !this.options.includes("query"))
-    ) {
+    const logLevel = this.options.level;
+
+    if (logLevel === "all" || logLevel === true || (Array.isArray(logLevel) && !logLevel.includes("query"))) {
       const sql =
         query + (parameters && parameters.length ? " -- PARAMETERS: " + this.stringifyParams(parameters) : "");
 
@@ -28,11 +25,9 @@ export class ConsoleLogger extends BaseLogger implements ILogger {
    * Logs query that is failed.
    */
   public logQueryError = (error: string, query: string, parameters?: any[]) => {
-    if (
-      this.options === "all" ||
-      this.options === true ||
-      (Array.isArray(this.options) && !this.options.includes("error"))
-    ) {
+    const logLevel = this.options.level;
+
+    if (logLevel === "all" || logLevel === true || (Array.isArray(logLevel) && !logLevel.includes("error"))) {
       const sql =
         query + (parameters && parameters.length ? " -- PARAMETERS: " + this.stringifyParams(parameters) : "");
 
@@ -51,14 +46,7 @@ export class ConsoleLogger extends BaseLogger implements ILogger {
     console.warn(`execution time:`, time);
   };
 
-  /**
-   * Logs events from the migration run process.
-   */
-  public logMigration = (message: string) => {
-    console.log(message);
-  };
-
-  constructor(private connection: Connection, private options?: LoggerOptions) {
+  constructor(private options: ILoggerOptions) {
     super();
   }
 }

@@ -1,39 +1,34 @@
-import { Connection } from "../connection/connection";
 import { ConsoleLogger } from "./implement/console-logger";
 import { ILogger } from "./logger";
 
-/**
- * Logger type.
- */
-export type LoggerType = "advanced-console" | "simple-console" | "file" | "debug" | ILogger;
-
-type LoggerLevel = "query" | "schema" | "error" | "warn" | "info" | "log" | "migration";
+type LogLevel = "query" | "error" | "warn" | "info";
 
 /**
- * Logging options.
+ * Logger options.
  */
-export type LoggerOptions = boolean | "all" | LoggerLevel[];
+export interface ILoggerOptions {
+  type?: "advanced-console" | "simple-console" | "file" | "debug";
+  level: boolean | "all" | LogLevel[];
+}
 
-export function loggerFactory(connection: Connection, logger?: LoggerType, options?: LoggerOptions): ILogger {
-  if (logger instanceof Object) {
-    return logger as ILogger;
+export function loggerFactory(
+  options: ILoggerOptions = {
+    level: ["warn", "error"],
   }
+): ILogger {
+  switch (options.type) {
+    case "simple-console":
+      throw new Error(`Not implement!`);
 
-  if (logger) {
-    switch (logger) {
-      case "simple-console":
-        throw new Error(`Not implement!`);
+    case "file":
+      throw new Error(`Not implement!`);
 
-      case "file":
-        throw new Error(`Not implement!`);
+    case "advanced-console":
+      throw new Error(`Not implement!`);
 
-      case "advanced-console":
-        throw new Error(`Not implement!`);
-
-      case "debug":
-        throw new Error(`Not implement!`);
-    }
+    case "debug":
+      throw new Error(`Not implement!`);
+    default:
+      return new ConsoleLogger(options);
   }
-
-  return new ConsoleLogger(connection, options);
 }

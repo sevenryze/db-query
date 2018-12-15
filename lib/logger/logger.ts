@@ -16,9 +16,4 @@ export interface ILogger {
    * Logs query that is slow.
    */
   logQuerySlow(time: number, query: string, parameters?: any[]): any;
-
-  /**
-   * Logs events from the migrations run process.
-   */
-  logMigration(message: string): any;
 }

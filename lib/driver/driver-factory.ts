@@ -1,18 +1,19 @@
-import { Connection } from "../connection/connection";
 import { IDriver } from "./Driver";
-import { IMongoDriverOptions, MongoDriver } from "./implement/mongo-driver";
 import { IMysqlDriverOptions, MysqlDriver } from "./implement/mysql-driver";
+import { IPostgresqlDriverOptions, PostgresqlDriver } from "./implement/postgresql-driver";
+
+export type IDriverOptions = IMysqlDriverOptions | IPostgresqlDriverOptions;
 
 /**
  * Creates a new driver depend on a given connection's driver type.
  */
-export function driverFactory(connection: Connection, options: IMongoDriverOptions | IMysqlDriverOptions): IDriver {
+export function driverFactory(options: IDriverOptions): IDriver {
   switch (options.type) {
     case "mysql":
-      return new MysqlDriver(connection, options);
+      return new MysqlDriver(options);
 
-    case "mongodb":
-      return new MongoDriver(connection, options);
+    case "postgresql":
+      return new PostgresqlDriver(options);
 
     default:
       throw new Error();
