@@ -15,6 +15,9 @@ describe(`Integration test`, () => {
         port: 3306,
         user: "test",
       },
+      logger: {
+        level: false,
+      },
     });
   });
 

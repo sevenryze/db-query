@@ -24,9 +24,9 @@ export interface IConnectionOptions {
 }
 
 /**
- * Connection is a single database ORM connection to a specific database.
+ * `Connection` is a single database ORM connection to a specific database.
  *
- * **Note:** The Connection may holds a pool of underlay connection.
+ * **Note:** The `Connection` may holds a pool of underlay raw connections.
  *
  * You can have multiple `Connections` to multiple databases in your application.
  */
@@ -46,7 +46,7 @@ export class Connection {
    * This method not necessarily creates database Connection (depend on database type),
    * but it also can setup a Connection Connection with database to use.
    */
-  public open = async (): Promise<this> => {
+  public async open(): Promise<this> {
     if (this.isDriverConnected) {
       throw new Error(this.name);
     }
@@ -58,13 +58,13 @@ export class Connection {
     this.isDriverConnected = true;
 
     return this;
-  };
+  }
 
   /**
    * Closes Connection with the database.
    * Once Connection is closed, you cannot use repositories or perform any operations except opening Connection again.
    */
-  public close = async (): Promise<void> => {
+  public async close(): Promise<void> {
     if (!this.isDriverConnected) {
       throw new Error(this.name);
     }
@@ -72,10 +72,10 @@ export class Connection {
     await this.driver.disconnect();
 
     this.isDriverConnected = false;
-  };
+  }
 
-  public getQueryRunner = async (): Promise<IQueryRunner> => {
-    const sqlRunner = await this.loggerWrapperSqlRunner();
+  public async getQueryRunner(): Promise<IQueryRunner> {
+    const sqlRunner = await this.wrappedSqlRunner();
 
     const filterdSqlRunner = async (sql: string, values?: any[]) => {
       const result = await sqlRunner.run(sql, values);
@@ -85,19 +85,13 @@ export class Connection {
     };
 
     return { run: filterdSqlRunner };
-  };
+  }
 
-  public getTransactionQueryRunner = async (): Promise<ITransactionQueryRunner> => {
-    const {
-      commitTransaction,
-      run,
-      rollbackTransaction,
-      startTransaction,
-      release,
-    } = await this.loggerWrapperSqlRunner();
+  public async getTransactionQueryRunner(): Promise<ITransactionQueryRunner> {
+    const { commitTransaction, run, rollbackTransaction, startTransaction, release } = await this.wrappedSqlRunner();
 
     return { commitTransaction, release, rollbackTransaction, run, startTransaction };
-  };
+  }
 
   constructor(options: IConnectionOptions) {
     this.name = options.name || "default";
@@ -122,25 +116,29 @@ export class Connection {
    */
   private readonly maxQueryExecutionTime: number = 60 * 1000;
 
+  private readonly slowQueryLogThreshold: number = 6 * 1000;
+
   /**
    * Indicates if Connection is initialized or not.
    */
   private isDriverConnected = false;
 
-  private loggerWrapperSqlRunner = async () => {
+  private async wrappedSqlRunner() {
     const logger = this.logger;
     const maxQueryExecutionTime = this.maxQueryExecutionTime;
+    const slowQueryLogThreshold = this.slowQueryLogThreshold;
     const sqlRunner = await this.driver.createSqlRunner();
 
     const run = async (sql: string, values?: any[]) => {
       logger.logQuery(sql, values);
-      
+
       const queryStartTime = Date.now();
+      // TODO: Use maxQueryExecutionTime to terminate long running queries.
       const result = await sqlRunner.run(sql, values);
       const queryEndTime = Date.now();
 
       const queryTime = queryEndTime - queryStartTime;
-      if (queryTime > maxQueryExecutionTime) {
+      if (queryTime > slowQueryLogThreshold) {
         logger.logQuerySlow(queryTime, sql, values);
       }
 
@@ -160,7 +158,7 @@ export class Connection {
     };
 
     return { commitTransaction, release, rollbackTransaction, run, startTransaction };
-  };
+  }
 }
 
 export interface IQueryRunner {

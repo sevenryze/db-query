@@ -9,7 +9,7 @@ export interface IMysqlDriverOptions extends mysql.PoolConfig {
  * Organizes communication with MySQL DBMS.
  */
 export class MysqlDriver implements IDriver {
-  public createSqlRunner = async (): Promise<ISqlRunner> => {
+  public async createSqlRunner(): Promise<ISqlRunner> {
     const connection: mysql.PoolConnection = await this.getConnection();
 
     const execute = (sql: string, values: any[]): Promise<any> => {
@@ -32,21 +32,21 @@ export class MysqlDriver implements IDriver {
     };
 
     return { release, run: execute };
-  };
+  }
 
   /**
    * Performs connection to the database.
    */
-  public connect = (): Promise<void> => {
+  public connect(): Promise<void> {
     return this.createPool(this.options);
-  };
+  }
 
   /**
    * Closes connection with the database.
    */
-  public disconnect = (): Promise<void> => {
+  public disconnect(): Promise<void> {
     return this.closePool();
-  };
+  }
 
   constructor(private options: IMysqlDriverOptions) {}
 

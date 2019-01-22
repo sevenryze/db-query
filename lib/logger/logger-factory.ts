@@ -1,7 +1,10 @@
 import { ConsoleLogger } from "./implement/console-logger";
 import { ILogger } from "./logger";
 
-type LogLevel = "query" | "error" | "warn" | "info";
+/**
+ * Logger levels.
+ */
+type LogLevel = "query" | "error" | "warn" | "info" | "slow";
 
 /**
  * Logger options.
