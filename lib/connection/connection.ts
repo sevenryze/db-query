@@ -1,26 +1,33 @@
-import { IDriver } from "../driver/driver";
 import { driverFactory, IDriverOptions } from "../driver/driver-factory";
-import { ILogger } from "../logger/Logger";
-import { ILoggerOptions, loggerFactory } from "../logger/logger-factory";
+import { IDriver, IPoolSqlRunner } from "../driver/IDriver";
+import { IQueryHook } from "../IQueryHook";
 
 export interface IConnectionOptions {
   /**
-   * Connection name. If connection name is not given then it will be called "default".
-   * Different connections must have different names.
+   * `Connection` name. If connection name is not given then it will be called "default".
+   *
+   * Different connections **MUST** have different names.
    */
-  readonly name?: string;
-
-  readonly driver: IDriverOptions;
-
-  /**
-   * Logging options.
-   */
-  readonly logger?: ILoggerOptions;
+  name?: string;
 
   /**
-   * Maximum number of milliseconds query should be executed before logger log a warning.
+   * The underlay db driver used by us.
+   *
+   * Currently we use `node-mysql` for mysql and `postgres` for postgresql.
    */
-  readonly maxQueryExecutionTime?: number;
+  driver: IDriverOptions;
+
+  /**
+   * Hooks performed on query events.
+   */
+  hooks?: IQueryHook[];
+
+  /**
+   * Maximum number of milliseconds query should be executed before terminating this query.
+   */
+  maxQueryExecutionThreshold?: number;
+
+  slowQueryThreshold?: number;
 }
 
 /**
@@ -62,7 +69,7 @@ export class Connection {
 
   /**
    * Closes Connection with the database.
-   * Once Connection is closed, you cannot use repositories or perform any operations except opening Connection again.
+   * Once `Connection` closed, you cannot use repositories or perform any operations except opening Connection again.
    */
   public async close(): Promise<void> {
     if (!this.isDriverConnected) {
@@ -75,29 +82,31 @@ export class Connection {
   }
 
   public async getQueryRunner(): Promise<IQueryRunner> {
-    const sqlRunner = await this.wrappedSqlRunner();
-
-    const filterdSqlRunner = async (sql: string, values?: any[]) => {
-      const result = await sqlRunner.run(sql, values);
-      await sqlRunner.release();
-
-      return result;
-    };
-
-    return { run: filterdSqlRunner };
+    return this.hookedSqlRunner(await this.driver.getPoolSqlRunner());
   }
 
   public async getTransactionQueryRunner(): Promise<ITransactionQueryRunner> {
-    const { commitTransaction, run, rollbackTransaction, startTransaction, release } = await this.wrappedSqlRunner();
+    const sqlRunner = this.hookedSqlRunner(await this.driver.getTransactionSqlRunner());
 
-    return { commitTransaction, release, rollbackTransaction, run, startTransaction };
+    const startTransaction = async (): Promise<void> => {
+      await sqlRunner.run(`START TRANSACTION`);
+    };
+    const commitTransaction = async (): Promise<void> => {
+      await sqlRunner.run(`COMMIT`);
+    };
+    const rollbackTransaction = async (): Promise<void> => {
+      await sqlRunner.run(`ROLLBACK`);
+    };
+
+    return { commitTransaction, release: sqlRunner.release, rollbackTransaction, run: sqlRunner.run, startTransaction };
   }
 
   constructor(options: IConnectionOptions) {
     this.name = options.name || "default";
 
-    this.maxQueryExecutionTime = options.maxQueryExecutionTime || this.maxQueryExecutionTime;
-    this.logger = loggerFactory(options.logger!);
+    this.maxQueryExecutionThreshold = options.maxQueryExecutionThreshold || this.maxQueryExecutionThreshold;
+    this.slowQueryThreshold = options.slowQueryThreshold || this.slowQueryThreshold;
+    this.hooks = options.hooks;
     this.driver = driverFactory(options.driver);
   }
 
@@ -109,28 +118,23 @@ export class Connection {
   /**
    * Logger used to log orm events.
    */
-  private readonly logger: ILogger;
+  private readonly hooks?: IQueryHook[];
 
   /**
    * Maximum number of milliseconds query should be executed before logger log a warning.
    */
-  private readonly maxQueryExecutionTime: number = 60 * 1000;
+  private readonly maxQueryExecutionThreshold: number = 60 * 1000;
 
-  private readonly slowQueryLogThreshold: number = 6 * 1000;
+  private readonly slowQueryThreshold: number = 6 * 1000;
 
   /**
    * Indicates if Connection is initialized or not.
    */
   private isDriverConnected = false;
 
-  private async wrappedSqlRunner() {
-    const logger = this.logger;
-    const maxQueryExecutionTime = this.maxQueryExecutionTime;
-    const slowQueryLogThreshold = this.slowQueryLogThreshold;
-    const sqlRunner = await this.driver.createSqlRunner();
-
-    const run = async (sql: string, values?: any[]) => {
-      logger.logQuery(sql, values);
+  private hookedSqlRunner<T extends IPoolSqlRunner>(sqlRunner: T): T {
+    const hookedRunner = async (sql: string, values?: any[]) => {
+      this.applyHooks(hook => hook.onQuery(sql, values));
 
       const queryStartTime = Date.now();
       // TODO: Use maxQueryExecutionTime to terminate long running queries.
@@ -138,32 +142,25 @@ export class Connection {
       const queryEndTime = Date.now();
 
       const queryTime = queryEndTime - queryStartTime;
-      if (queryTime > slowQueryLogThreshold) {
-        logger.logQuerySlow(queryTime, sql, values);
+      if (queryTime > this.slowQueryThreshold) {
+        this.applyHooks(hook => hook.onSlow(queryTime, sql, values));
       }
 
       return result;
     };
-    const release = () => {
-      return sqlRunner.release();
-    };
-    const startTransaction = (): Promise<void> => {
-      return run(`START TRANSACTION`);
-    };
-    const commitTransaction = (): Promise<void> => {
-      return run(`COMMIT`);
-    };
-    const rollbackTransaction = (): Promise<void> => {
-      return run(`ROLLBACK`);
-    };
 
-    return { commitTransaction, release, rollbackTransaction, run, startTransaction };
+    return {
+      ...sqlRunner,
+      run: hookedRunner,
+    };
+  }
+
+  private applyHooks(method: (hook: IQueryHook) => void) {
+    this.hooks && this.hooks.forEach(method);
   }
 }
 
-export interface IQueryRunner {
-  run(sqlString: string, values?: any[]): Promise<any>;
-}
+export interface IQueryRunner extends IPoolSqlRunner {}
 
 export interface ITransactionQueryRunner extends IQueryRunner {
   startTransaction(isolationLevel?: string): Promise<void>;

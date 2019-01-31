@@ -1,5 +1,4 @@
-import { createConnection, getQueryRunner, getTransactionQueryRunner } from "../lib";
-import { Connection } from "../lib/connection/connection";
+import { Connection, ConsoleLogger, createConnection, getQueryRunner, getTransactionQueryRunner } from "../lib";
 
 describe(`Integration test`, () => {
   let connection: Connection;
@@ -15,9 +14,8 @@ describe(`Integration test`, () => {
         port: 3306,
         user: "test",
       },
-      logger: {
-        level: false,
-      },
+
+      // hooks: [new ConsoleLogger()],
     });
   });
 
@@ -27,29 +25,41 @@ describe(`Integration test`, () => {
 
   it(`Should run normal query`, async () => {
     const queryRunner = await getQueryRunner();
-    const result = await queryRunner.run("SELECT 1 + 1 AS solution");
+    const { results } = await queryRunner.run("SELECT 1 + 1 AS solution");
 
-    expect(result[0].solution).toEqual(2);
+    expect(results[0].solution).toEqual(2);
+  });
+
+  it(`Should use pooled query`, async () => {
+    const queryRunner = await getQueryRunner();
+    const { results } = await queryRunner.run("SELECT 1 + 1 AS solution");
+    expect(results[0].solution).toEqual(2);
+
+    const { results: results2 } = await queryRunner.run("SELECT 1 + 1 AS solution");
+    expect(results2[0].solution).toEqual(2);
+
+    const { results: results3 } = await queryRunner.run("SELECT 1 + 1 AS solution");
+    expect(results3[0].solution).toEqual(2);
   });
 
   it(`Should run transaction commit query`, async () => {
     const transactionQueryRunner = await getTransactionQueryRunner();
     await transactionQueryRunner.startTransaction();
-    const result = await transactionQueryRunner.run(`select ? + ? AS solution`, [1, 1]);
+    const { results } = await transactionQueryRunner.run(`select ? + ? AS solution`, [1, 1]);
     await transactionQueryRunner.commitTransaction();
     await transactionQueryRunner.release();
 
-    expect(result[0].solution).toEqual(2);
+    expect(results[0].solution).toEqual(2);
   });
 
   it(`Should run transaction rollback query`, async () => {
     const transactionQueryRunner = await getTransactionQueryRunner();
     await transactionQueryRunner.startTransaction();
-    const result = await transactionQueryRunner.run(`select ? + ? AS solution`, [1, 1]);
+    const { results } = await transactionQueryRunner.run(`select ? + ? AS solution`, [1, 1]);
     await transactionQueryRunner.rollbackTransaction();
     await transactionQueryRunner.release();
 
-    expect(result[0].solution).toEqual(2);
+    expect(results[0].solution).toEqual(2);
   });
 
   it(`Should support multiple connections`, async () => {
@@ -66,14 +76,14 @@ describe(`Integration test`, () => {
     });
 
     let queryRunner = await getQueryRunner("test1");
-    let result = await queryRunner.run("SELECT 1 + 1 AS solution");
+    const { results } = await queryRunner.run("SELECT 1 + 1 AS solution");
 
-    expect(result[0].solution).toEqual(2);
+    expect(results[0].solution).toEqual(2);
 
     queryRunner = await getQueryRunner("test2");
-    result = await queryRunner.run("SELECT 1 + 2 AS solution");
+    const { results: r2 } = await queryRunner.run("SELECT 1 + 2 AS solution");
 
-    expect(result[0].solution).toEqual(3);
+    expect(r2[0].solution).toEqual(3);
 
     await tempConnection1.close();
     await tempConnection2.close();

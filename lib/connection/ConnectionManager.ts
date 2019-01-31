@@ -1,4 +1,4 @@
-import { Connection, IConnectionOptions } from "./connection";
+import { Connection, IConnectionOptions } from "./Connection";
 
 /**
  * ConnectionManager is used to store and manage multiple orm connections.
@@ -55,4 +55,3 @@ export class ConnectionManager {
   }
 }
 
-export const defaultConnectionManager = new ConnectionManager();

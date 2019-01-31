@@ -1,5 +1,5 @@
 import mysql from "mysql";
-import { IDriver, ISqlRunner } from "../driver";
+import { IDriver, IPoolSqlRunner, ITransactionSqlRunner } from "../IDriver";
 
 export interface IMysqlDriverOptions extends mysql.PoolConfig {
   type: "mysql";
@@ -9,17 +9,39 @@ export interface IMysqlDriverOptions extends mysql.PoolConfig {
  * Organizes communication with MySQL DBMS.
  */
 export class MysqlDriver implements IDriver {
-  public async createSqlRunner(): Promise<ISqlRunner> {
+  public async getPoolSqlRunner(): Promise<IPoolSqlRunner> {
+    const run = (sql: string, values: any[]): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        this.pool!.query(sql, values, (error, results, fieldsInfo) => {
+          if (error) {
+            return reject(error);
+          }
+
+          resolve({
+            fieldsInfo,
+            results,
+          });
+        });
+      });
+    };
+
+    return { run };
+  }
+
+  public async getTransactionSqlRunner(): Promise<ITransactionSqlRunner> {
     const connection: mysql.PoolConnection = await this.getConnection();
 
-    const execute = (sql: string, values: any[]): Promise<any> => {
+    const run = (sql: string, values: any[]): Promise<any> => {
       return new Promise((resolve, reject) => {
         connection.query(sql, values, (error, results, fieldsInfo) => {
           if (error) {
             return reject(error);
           }
 
-          resolve(results);
+          resolve({
+            fieldsInfo,
+            results,
+          });
         });
       });
     };
@@ -31,7 +53,7 @@ export class MysqlDriver implements IDriver {
       });
     };
 
-    return { release, run: execute };
+    return { release, run };
   }
 
   /**
@@ -65,7 +87,7 @@ export class MysqlDriver implements IDriver {
       // create a connection pool
       const pool = mysql.createPool(options);
 
-      // (issue #610) we make first connection to database to make sure if connection credentials are wrong
+      // we make first connection to database to make sure if connection credentials are wrong
       // we give error before calling any other method that creates actual query runner
       pool.getConnection((err, connection) => {
         if (err) {

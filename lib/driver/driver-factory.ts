@@ -1,6 +1,6 @@
-import { IDriver } from "./Driver";
-import { IMysqlDriverOptions, MysqlDriver } from "./implement/mysql-driver";
-import { IPostgresqlDriverOptions, PostgresqlDriver } from "./implement/postgresql-driver";
+import { IDriver } from "./IDriver";
+import { IMysqlDriverOptions, MysqlDriver } from "./implement/MysqlDriver";
+import { IPostgresqlDriverOptions, PostgresqlDriver } from "./implement/PostgresqlDriver";
 
 export type IDriverOptions = IMysqlDriverOptions | IPostgresqlDriverOptions;
 
@@ -16,6 +16,6 @@ export function driverFactory(options: IDriverOptions): IDriver {
       return new PostgresqlDriver(options);
 
     default:
-      throw new Error();
+      throw new Error(`Invalid database type, must be mysql or postgresql.`);
   }
 }

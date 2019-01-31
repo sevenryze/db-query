@@ -1,5 +1,11 @@
-import { Connection, IConnectionOptions } from "./connection/connection";
-import { defaultConnectionManager } from "./connection/connection-manager";
+import { Connection, IConnectionOptions } from "./connection/Connection";
+import { ConnectionManager } from "./connection/ConnectionManager";
+
+export { ConsoleLogger } from "./logger/ConsoleLogger";
+export { Connection } from "./connection/Connection";
+export { ConnectionManager } from "./connection/ConnectionManager";
+
+const defaultConnectionManager = new ConnectionManager();
 
 export function getConnectionManager() {
   return defaultConnectionManager;

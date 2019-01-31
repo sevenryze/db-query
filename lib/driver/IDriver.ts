@@ -1,7 +1,15 @@
-export interface ISqlRunner {
-  run(sqlString: string, values?: any[]): Promise<any>;
-
+export interface ITransactionSqlRunner extends IPoolSqlRunner {
   release(): Promise<void>;
+}
+
+export interface IPoolSqlRunner {
+  run(
+    sqlString: string,
+    values?: any[]
+  ): Promise<{
+    fieldsInfo: any;
+    results: any[];
+  }>;
 }
 
 /**
@@ -20,7 +28,12 @@ export interface IDriver {
   disconnect(): Promise<void>;
 
   /**
-   * Create a single sql executor.
+   * Create a single sql runner.
    */
-  createSqlRunner(): Promise<ISqlRunner>;
+  getTransactionSqlRunner(): Promise<ITransactionSqlRunner>;
+
+  /**
+   * Create a pooled sql runner.
+   */
+  getPoolSqlRunner(): Promise<IPoolSqlRunner>;
 }
